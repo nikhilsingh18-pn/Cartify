@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { PartnerApplication } from '../types';
+import { api } from '../lib/api';
 
 interface AdminContextType {
   applications: PartnerApplication[];
@@ -7,6 +8,7 @@ interface AdminContextType {
   updateApplicationStatus: (id: string, status: PartnerApplication['status']) => void;
   pendingCount: number;
   categories: string[];
+  categoryList: { id: number; name: string }[];
   addCategory: (name: string) => void;
   removeCategory: (name: string) => void;
 }
@@ -18,20 +20,47 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [categories, setCategories] = useState<string[]>([
     'Electronics', 'Fashion', 'Home & Garden', 'Groceries', 'Books', 'Beauty & Personal Care', 'Sports & Outdoors', 'Toys & Games'
   ]);
+  const [categoryList, setCategoryList] = useState<{ id: number; name: string }[]>([]);
 
-  // Load from local storage on mount
   useEffect(() => {
-    const savedApps = localStorage.getItem('cartify_applications');
-    if (savedApps) {
-      setApplications(JSON.parse(savedApps));
-    }
-    const savedCats = localStorage.getItem('cartify_categories');
-    if (savedCats) {
-      setCategories(JSON.parse(savedCats));
-    }
+    api.admin.categories.list().then((cats: { id: number; name: string }[]) => {
+      setCategories(cats.map(c => c.name));
+      setCategoryList(cats);
+      localStorage.setItem('cartify_categories', JSON.stringify(cats.map(c => c.name)));
+    }).catch(() => {
+      const savedCats = localStorage.getItem('cartify_categories');
+      if (savedCats) setCategories(JSON.parse(savedCats));
+    });
+    api.admin.applications.list().then((apps: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      role: 'seller' | 'delivery';
+      details: string;
+      extraInfo: string;
+      status: 'pending' | 'approved' | 'rejected';
+      date: string;
+    }[]) => {
+      const normalized = apps.map(a => ({
+        id: a.id,
+        name: a.name,
+        email: a.email,
+        phone: a.phone,
+        role: a.role,
+        details: a.details,
+        extraInfo: a.extraInfo,
+        status: a.status,
+        date: new Date(a.date),
+      } as PartnerApplication));
+      setApplications(normalized);
+      localStorage.setItem('cartify_applications', JSON.stringify(normalized));
+    }).catch(() => {
+      const savedApps = localStorage.getItem('cartify_applications');
+      if (savedApps) setApplications(JSON.parse(savedApps));
+    });
   }, []);
 
-  // Save to local storage on change
   useEffect(() => {
     localStorage.setItem('cartify_applications', JSON.stringify(applications));
   }, [applications]);
@@ -40,34 +69,49 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('cartify_categories', JSON.stringify(categories));
   }, [categories]);
 
-  const submitApplication = (appData: Omit<PartnerApplication, 'id' | 'status' | 'date'>) => {
+  const submitApplication = async (appData: Omit<PartnerApplication, 'id' | 'status' | 'date'>) => {
+    const created = await api.admin.applications.submit(appData);
     const newApp: PartnerApplication = {
-      ...appData,
-      id: `app-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      status: 'pending',
-      date: new Date(),
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      phone: created.phone,
+      role: created.role,
+      details: created.details,
+      extraInfo: created.extraInfo,
+      status: created.status,
+      date: new Date(created.date),
     };
     setApplications(prev => [newApp, ...prev]);
   };
 
-  const updateApplicationStatus = (id: string, status: PartnerApplication['status']) => {
+  const updateApplicationStatus = async (id: string, status: PartnerApplication['status']) => {
+    await api.admin.applications.updateStatus(id, status);
     setApplications(prev => prev.map(app => app.id === id ? { ...app, status } : app));
   };
 
-  const addCategory = (name: string) => {
-    if (!categories.includes(name)) {
-      setCategories(prev => [...prev, name]);
-    }
+  const addCategory = async (name: string) => {
+    if (categories.includes(name)) return;
+    await api.admin.categories.add(name);
+    const cats: { id: number; name: string }[] = await api.admin.categories.list();
+    setCategories(cats.map((c) => c.name));
+    setCategoryList(cats);
   };
 
-  const removeCategory = (name: string) => {
-    setCategories(prev => prev.filter(c => c !== name));
+  const removeCategory = async (name: string) => {
+    const cats: { id: number; name: string }[] = await api.admin.categories.list();
+    const target = cats.find((c) => c.name === name);
+    if (!target) return;
+    await api.admin.categories.remove(target.id);
+    const refreshed: { id: number; name: string }[] = await api.admin.categories.list();
+    setCategories(refreshed.map((c) => c.name));
+    setCategoryList(refreshed);
   };
 
   const pendingCount = applications.filter(app => app.status === 'pending').length;
 
   return (
-    <AdminContext.Provider value={{ applications, submitApplication, updateApplicationStatus, pendingCount, categories, addCategory, removeCategory }}>
+    <AdminContext.Provider value={{ applications, submitApplication, updateApplicationStatus, pendingCount, categories, categoryList, addCategory, removeCategory }}>
       {children}
     </AdminContext.Provider>
   );

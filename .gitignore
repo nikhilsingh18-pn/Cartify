@@ -1,1 +1,16 @@
+# env files
+.env
+.env.local
+.vite.env.local
+
+# python
+.venv/
+__pycache__/
+
+# node
 node_modules/
+dist/
+
+# lock files
+package-lock.json
+src/vite.env.local

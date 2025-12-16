@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  customer
+  seller
+  delivery
+  admin
+}
+
+enum PartnerRole {
+  seller
+  delivery
+}
+
+enum OrderStatus {
+  pending
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+}
+
+enum ApplicationStatus {
+  pending
+  approved
+  rejected
+}
+
+model User {
+  id       String  @id @default(cuid())
+  name     String
+  email    String  @unique
+  password String
+  role     Role
+  avatar   String?
+  phone    String?
+  address  String?
+  rewards  Int?
+  products Product[]
+  orders   Order[]
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  categoryId   Int?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  price        Int
+  comparePrice Int?
+  image        String
+  images       Json?
+  description  String
+  rating       Float
+  reviews      Int
+  stock        Int
+  sellerId     String
+  seller       User     @relation(fields: [sellerId], references: [id])
+  trending     Boolean?
+  discount     Int?
+  tags         Json?
+  deliveryTime Int?
+  createdAt    DateTime @default(now())
+  orderItems   OrderItem[]
+}
+
+model Order {
+  id               String   @id @default(cuid())
+  customerId       String
+  customer         User     @relation(fields: [customerId], references: [id])
+  items            OrderItem[]
+  total            Int
+  status           OrderStatus
+  paymentStatus    PaymentStatus
+  deliveryPartnerId String?
+  shippingAddress  String
+  trackingNumber   String?
+  createdAt        DateTime @default(now())
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model PartnerApplication {
+  id        String            @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  role      PartnerRole
+  details   String
+  extraInfo String
+  status    ApplicationStatus @default(pending)
+  date      DateTime          @default(now())
+}

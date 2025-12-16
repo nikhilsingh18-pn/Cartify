@@ -3,10 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Filter, Grid, List, SlidersHorizontal, Zap } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { useProducts } from '../context/ProductContext';
+import { useAdmin } from '../context/AdminContext';
 import { Product } from '../types';
 
 const Products: React.FC = () => {
-  const { products: allProducts } = useProducts();
+  const { products: allProducts, refreshProducts, loading } = useProducts();
+  const { categories: adminCategories, categoryList } = useAdmin();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || 'all');
@@ -14,9 +16,11 @@ const Products: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || 'featured');
   const [show10Min, setShow10Min] = useState<boolean>(searchParams.get('delivery') === '10min');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(12);
   const [showFilters, setShowFilters] = useState(false);
 
-  const categories = useMemo(() => ['all', ...Array.from(new Set(allProducts.map(p => p.category)))], [allProducts]);
+  const categories = useMemo(() => ['all', ...adminCategories], [adminCategories]);
 
   const filteredProducts = useMemo(() => {
     let products = [...allProducts];
@@ -63,11 +67,31 @@ const Products: React.FC = () => {
     if (selectedCategory !== 'all') params.set('category', selectedCategory);
     if (show10Min) params.set('delivery', '10min');
     if (sortBy !== 'featured') params.set('sort', sortBy);
+    params.set('page', String(page));
+    params.set('pageSize', String(pageSize));
     const searchQuery = searchParams.get('search');
-    if(searchQuery) params.set('search', searchQuery);
-    
+    if (searchQuery) params.set('search', searchQuery);
+
     setSearchParams(params, { replace: true });
-  }, [selectedCategory, show10Min, sortBy, setSearchParams]);
+
+    const q: Record<string, string | number | boolean> = {};
+    if (selectedCategory !== 'all') q.category = selectedCategory;
+    if (selectedCategory !== 'all') {
+      const match = categoryList.find(c => c.name === selectedCategory);
+      if (match) q.categoryId = match.id;
+    }
+    if (show10Min) q.deliveryTime = 10;
+    if (sortBy) q.sort = sortBy;
+    if (priceRange) q.priceMax = priceRange;
+    if (searchQuery) q.search = searchQuery;
+    q.page = page;
+    q.pageSize = pageSize;
+
+    const t = setTimeout(() => {
+      refreshProducts(q);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [selectedCategory, show10Min, sortBy, page, pageSize, priceRange]);
 
 
   return (
@@ -143,17 +167,50 @@ const Products: React.FC = () => {
             <div className="mb-4 text-subtle">
               Showing {filteredProducts.length} of {allProducts.length} products
             </div>
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            {loading ? (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                {Array.from({ length: viewMode === 'grid' ? 6 : 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse bg-white rounded-lg shadow-sm border p-6 h-40" />
+                ))}
+              </div>
+            ) : (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
             {filteredProducts.length === 0 && (
               <div className="text-center py-16 bg-white rounded-lg shadow-sm border">
                 <p className="text-xl text-subtle">No products found</p>
                 <p className="text-gray-500 mt-2">Try adjusting your filters</p>
               </div>
             )}
+            <div className="flex items-center justify-between mt-6">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  className="px-3 py-2 bg-white border rounded-lg disabled:opacity-50"
+                  disabled={page === 1}
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  className="px-3 py-2 bg-white border rounded-lg"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-subtle">Per page</span>
+                <select value={pageSize} onChange={(e) => setPageSize(parseInt(e.target.value))} className="bg-white border rounded-lg px-2 py-1">
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+              </div>
+            </div>
           </main>
         </div>
       </div>

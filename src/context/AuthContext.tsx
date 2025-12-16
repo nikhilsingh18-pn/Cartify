@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import { api, setToken, getToken } from '../lib/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: User['role']) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: User['role']) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -18,24 +20,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+    const t = getToken();
+    if (t) {
+      api.auth.me().then((u) => {
+        setUser(u);
+        localStorage.setItem('cartify_user', JSON.stringify(u));
+      }).catch(() => {});
+    }
   }, []);
 
-  const login = (email: string, password: string, role: User['role']) => {
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: role === 'admin' ? 'Admin User' : email.split('@')[0],
-      email,
-      role,
-      avatar: `https://ui-avatars.com/api/?name=${role === 'admin' ? 'Admin' : email.split('@')[0]}&background=random`,
-      rewards: 1250,
-    };
-    setUser(mockUser);
-    localStorage.setItem('cartify_user', JSON.stringify(mockUser));
+  const login = async (email: string, password: string) => {
+    const tokenRes = await api.auth.login(email, password);
+    setToken(tokenRes.access_token);
+    const u = await api.auth.me();
+    setUser(u);
+    localStorage.setItem('cartify_user', JSON.stringify(u));
+  };
+
+  const register = async (name: string, email: string, password: string, role: User['role']) => {
+    const tokenRes = await api.auth.register(name, email, password, role);
+    setToken(tokenRes.access_token);
+    const u = await api.auth.me();
+    setUser(u);
+    localStorage.setItem('cartify_user', JSON.stringify(u));
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('cartify_user');
+    setToken(null);
   };
 
   const updateUser = (updatedUser: User) => {
@@ -44,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

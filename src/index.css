@@ -8,3 +8,6 @@ body {
   font-family: 'Inter', sans-serif;
   @apply bg-background text-foreground;
 }
+.floating-chat {
+  pointer-events: none;
+}

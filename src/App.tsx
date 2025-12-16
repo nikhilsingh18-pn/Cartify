@@ -52,7 +52,7 @@ function App() {
                   </Routes>
                 </main>
                 <Footer />
-                <AIChatbot />
+                {/* <AIChatbot /> */}
               </div>
             </CartProvider>
           </ProductProvider>
@@ -63,3 +63,4 @@ function App() {
 }
 
 export default App;
+

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Zap } from 'lucide-react';
 import { Product } from '../types';
 import { motion } from 'framer-motion';
 

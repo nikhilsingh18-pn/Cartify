@@ -8,7 +8,7 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'customer' | 'seller' | 'delivery' | 'admin'>('customer');
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -18,9 +18,14 @@ const Login: React.FC = () => {
     if (roleParam === 'admin') setRole('admin');
   }, [searchParams]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password, role);
+    console.log("BUTTON CLICKED");
+    if (isLogin) {
+      await login(email, password);
+    } else {
+      await register(email.split('@')[0], email, password, role);
+    }
     const redirect = searchParams.get('redirect');
     if (redirect) {
       navigate(redirect);
@@ -30,7 +35,7 @@ const Login: React.FC = () => {
         seller: '/seller/dashboard',
         delivery: '/delivery/dashboard',
         admin: '/admin/dashboard',
-      };
+      } as const;
       navigate(dashboardRoutes[role]);
     }
   };

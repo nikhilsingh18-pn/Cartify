@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreditCard, MapPin, User, Shield, CheckCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
 
 const Checkout: React.FC = () => {
   const { cart, cartTotal, clearCart } = useCart();
@@ -29,18 +30,24 @@ const Checkout: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step < 3) {
       setStep(step + 1);
     } else {
-      // In a real app, you would process the payment here
-      if (user) {
-        updateUser({
-          ...user,
-          rewards: (user.rewards || 0) + Math.floor(total)
-        });
+      if (!user) {
+        navigate(`/login?redirect=${encodeURIComponent('/checkout')}`);
+        return;
       }
+      const items = cart.map(ci => ({ productId: ci.product.id, quantity: ci.quantity }));
+      const shippingAddress = `${formData.address}, ${formData.city} - ${formData.postcode}`;
+      try {
+        await api.orders.create(items, shippingAddress);
+      } catch {}
+      updateUser({
+        ...user,
+        rewards: (user.rewards || 0) + Math.floor(total)
+      });
       clearCart();
       navigate('/order-success');
     }

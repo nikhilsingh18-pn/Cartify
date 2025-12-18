@@ -1,6 +1,7 @@
 fastapi
-uvicorn
+uvicorn[standard]
 prisma
 passlib[bcrypt]
-PyJWT
+python-multipart
 python-dotenv
+PyJWT
